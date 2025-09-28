@@ -8,8 +8,8 @@ Beam Lite is an MVP for beaming URLs from an iOS Share Sheet directly into Chrom
 - **Cloudflare Worker:** Authenticates requests via inbox keys, stores pending items in Workers KV, emits Web Push notifications, and serves catch-up/ack endpoints.
 
 ## Getting Started
-1. Read the PRD (`prd-mvp.md`) to understand goals and scope.
-2. Review the technical design (`tech-design.md`) for detailed flows and the proposed monorepo structure.
+1. Read the PRD (`docs/prd-mvp.md`) to understand goals and scope.
+2. Review the technical design (`docs/tech-design.md`) for detailed flows and the proposed repository structure.
 3. Stand up the Cloudflare Worker with a KV namespace for pending items.
 4. Build and load the Chrome extension (MV3) in developer mode.
 5. Import the Shortcuts (`Add Beam Device`, `Send to Beam`, and per-device variants) on iOS.
@@ -17,19 +17,10 @@ Beam Lite is an MVP for beaming URLs from an iOS Share Sheet directly into Chrom
 ## Repository Layout
 ```
 /beam-lite
-  /apps
-    /chrome-extension      # MV3 source
-    /shortcuts             # Shortcut exports & tooling
-  /services
-    /api-worker            # Cloudflare Worker source
-  /packages
-    /shared-types          # Shared schemas and DTOs
-    /shared-utils          # Optional shared helpers
-  /infrastructure
-    /terraform             # Future IaC (placeholder)
-    /wrangler              # Worker configs per environment
-  prd-mvp.md               # Product requirements
-  tech-design.md           # Technical design
+  /extension        # MV3 Chrome extension source
+  /worker           # Cloudflare Worker source
+  /shortcuts        # Shortcut exports & tooling
+  /docs             # prd-mvp.md, tech-design.md, future notes
   README.md
 ```
 

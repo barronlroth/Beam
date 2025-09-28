@@ -7,7 +7,7 @@ Beam Lite delivers a zero-friction path from an iOS share action to opening the 
 - **Chrome Extension (Receiver):** Registers/pairs devices, listens for pushes, opens tabs, performs catch-up, and exposes options UI for key rotation and configuration.
 - **Apple Shortcuts (Sender):** Maintains a local registry of paired devices (`BeamDevices.json` in iCloud Drive/Shortcuts), provides Share Sheet action plus per-device shortcuts, and POSTs payloads to the backend.
 - **Cloudflare Worker API (Backend):** Authenticates requests using per-device inbox keys, stores pending items in Workers KV, sends Web Push notifications, and exposes endpoints for catch-up and acknowledgements.
-- **Workers KV Storage:** Persists pending items and minimal delivery metadata necessary for catch-up and dedupe.
+- **Workers KV Storage:** Persists pending items and minimal delivery metadata necessary for catch-up.
 
 ## 3. Pairing Flow
 1. **Extension install**
@@ -24,21 +24,21 @@ Beam Lite delivers a zero-friction path from an iOS share action to opening the 
    - Show success notification.
 
 ## 4. Send & Deliver Flow
-1. User shares a URL via Safari Share Sheet → **Send to Beam** Shortcut.
-2. Shortcut loads `BeamDevices.json`, lets the user pick targets (or uses per-device shortcut), and constructs payload `{ url, title?, sentAt = now }`.
+1. User shares a URL via Safari Share Sheet -> **Send to Beam** Shortcut.
+2. Shortcut loads `BeamDevices.json`, lets the user pick targets (or uses per-device shortcut), and constructs payload `{ url, sentAt = now }`.
 3. Shortcut POSTs to `/v1/inbox/{deviceId}` with `X-Inbox-Key: <inboxKey>`.
-4. Worker validates key, assigns `itemId`, writes pending record to KV, and sends Web Push payload `{ itemId, url, title?, sentAt }`.
-5. Extension service worker receives push →
+4. Worker validates key, assigns `itemId`, writes pending record to KV, and sends Web Push payload `{ itemId, url, sentAt }`.
+5. Extension service worker receives push ->
    - Respects dedupe (skip if recently opened).
    - Opens a new tab (or shows notification if `autoOpen` disabled).
-   - Sets `deliveredAt` locally and immediately calls `POST /v1/items/{itemId}/ack` with `X-Inbox-Key`.
-6. Worker marks item acknowledged (delete/persist `openedAt`) and stops further delivery.
+   - Immediately calls `POST /v1/items/{itemId}/ack` with `X-Inbox-Key`.
+6. Worker marks item acknowledged (deletes KV entry) and stops further delivery.
 
 ## 5. Catch-up Flow
 - On `chrome.runtime.onStartup` (and optionally via periodic alarm), extension calls `GET /v1/devices/{deviceId}/pending` with `X-Inbox-Key`.
-- Worker lists pending KV entries (ordered by `createdAt`).
+- Worker lists pending KV entries (ordered by enqueue time).
 - Extension opens each URL (respecting storm control), then ACKs each item.
-- KV entry deleted (or `deliveredAt`/`openedAt` updated) after ACK.
+- KV entry deleted after ACK or expires via TTL if never ACKed.
 
 ## 6. Key Rotation
 - Options page exposes "Rotate Key".
@@ -50,8 +50,8 @@ Beam Lite delivers a zero-friction path from an iOS share action to opening the 
 ## 7. Data Model & Storage
 ### Workers KV
 - **Key format:** `device:{deviceId}:item:{itemId}`.
-- **Value:** `{ itemId, deviceId, url, title?, sentAt, createdAt, deliveredAt?, openedAt? }`.
-- TTL not used (manual clean-up via ACK).
+- **Value:** `{ itemId, deviceId, url, sentAt }`.
+- TTL: 7 days applied when writing to KV (insurance against unacknowledged items).
 - Secondary index optional for debugging (e.g., `recent:{deviceId}` with sorted list).
 
 ### In-memory / Runtime
@@ -64,14 +64,14 @@ Beam Lite delivers a zero-friction path from an iOS share action to opening the 
   - Idempotent updates allowed.
 - `POST /v1/inbox/:deviceId`
   - Headers: `X-Inbox-Key`.
-  - Body `{ url, title?, sentAt?, sourceDeviceName? }`.
+  - Body `{ url, sentAt? }`.
   - Response `202` with `{ itemId }` (for logging if needed).
 - `GET /v1/devices/:deviceId/pending`
   - Headers: `X-Inbox-Key`.
   - Response `{ items: [...] }`.
 - `POST /v1/items/:itemId/ack`
   - Headers: `X-Inbox-Key`.
-  - Body optional `{ deliveredAt?, openedAt? }` (extension can omit; server records receipt timestamp).
+  - Body optional `{ receivedAt? }` (extension usually omits; server records receipt timestamp automatically).
 - `POST /v1/devices/:deviceId/rotate-key`
   - Headers: `X-Inbox-Key` (old).
   - Body `{ keyHash, subscription? }` (allows subscription refresh).
@@ -80,9 +80,9 @@ Beam Lite delivers a zero-friction path from an iOS share action to opening the 
 - **Manifest:** MV3 with permissions `tabs`, `storage`, `notifications`, `alarms`.
 - **Service worker:**
   - Handles install/update, push, alarms, startup.
-  - Enforces storm control (max 3 tabs/sec) and dedupe window (60s).
-  - Persists delivery metadata in `chrome.storage.local` for quick checks.
-- **Options page:** React/Vite or vanilla (small scope). Displays device info, toggles (`autoOpen`, `coalesceBursts`), QR/JSON, rotate key button.
+  - Enforces storm control (max 3 tabs/sec) and a 60s dedupe window.
+  - Persists recent URL timestamps in `chrome.storage.local` for dedupe only.
+- **Options page:** React/Vite or vanilla (small scope). Displays device info, toggle (`autoOpen`), QR/JSON, rotate key button.
 - **Popup (optional):** lightweight history view (reads last 20 items from local storage) and quick toggle.
 
 ## 10. Apple Shortcuts Details
@@ -93,15 +93,15 @@ Beam Lite delivers a zero-friction path from an iOS share action to opening the 
   ]
   ```
 - **Storage location:** `iCloud Drive/Shortcuts/BeamDevices.json` (auto-created if missing).
-- **Add Beam Device:** supports QR scan and manual paste; validates required keys before save.
-- **Send to Beam:** Share Sheet only accepts URLs, supports "All Desktops" fan-out, includes `sentAt` timestamp.
+- **Add Beam Device:** supports QR scan and manual paste; validates required keys, dedupes by `deviceId`, and treats last write as authoritative to tolerate iCloud sync races.
+- **Send to Beam:** Share Sheet only accepts URLs, supports "All Desktops" fan-out, includes `sentAt` timestamp, and surfaces a re-pair alert when the backend returns HTTP 401.
 - **Per-device shortcuts:** Hard-coded target, same payload structure, optional Quick Actions placement.
 
 ## 11. Backend Implementation (Cloudflare Worker)
 - **Runtime:** TypeScript module worker (`export default { fetch }`).
-- **Dependencies:** `itty-router` (optional), `@cloudflare/kv-asset-handler` not needed, Web Crypto native for SHA-256 & Web Push VAPID.
-- **Web Push:** Use `@webpush-libs/webpush`-style logic or hand-rolled util leveraging Workers `crypto.subtle`.
-- **Rate limiting:** Basic in-memory token bucket keyed by IP + deviceId (per-request) with fallback KV-based counters if needed.
+- **Dependencies:** `itty-router` (optional). Rely solely on built-in Web Crypto APIs for hashing and VAPID signing (no Node-only packages).
+- **Web Push:** Hand-roll VAPID/JWT creation and payload encryption with Workers `crypto.subtle` per the W3C Web Push spec.
+- **Rate limiting:** Prefer Cloudflare Ruleset/Rate Limiting configuration (10 req/min per IP/device). Worker provides a lightweight KV counter fallback for per-device bursting.
 - **Logging:** Use `console.log` with redaction (never log `X-Inbox-Key`).
 - **Error responses:** JSON body `{ error: { code, message } }` with appropriate HTTP status.
 
@@ -114,7 +114,7 @@ Beam Lite delivers a zero-friction path from an iOS share action to opening the 
 - Transport over HTTPS only (`wrangler` routes enforce).
 - Secrets handled client-side; server stores only hashes.
 - Rotate keys on demand; expired keys reject requests (HTTP 401).
-- Minimal retention: KV entries removed on ACK, no long-term server-side history in MVP.
+- Minimal retention: KV entries removed on ACK, with a 7-day TTL safety net; no long-term server-side history in MVP.
 - Dedupe to prevent tab storms; rate limiting to mitigate abuse.
 
 ## 14. Deployment Workflow
@@ -127,30 +127,16 @@ Beam Lite delivers a zero-friction path from an iOS share action to opening the 
 ## 15. Proposed Monorepo Structure
 ```
 /beam-lite
-  /apps
-    /chrome-extension      # MV3 source (src/, manifests/, build tooling)
-    /shortcuts             # Shortcut exports, documentation, automation scripts
-  /services
-    /api-worker            # Cloudflare Worker source (TypeScript), wrangler config, KV bindings
-  /packages
-    /shared-types          # Shared TypeScript types (item payloads, device schemas)
-    /shared-utils          # Optional helpers (e.g., schema validation)
-  /infrastructure
-    /terraform             # Future IaC (placeholder)
-    /wrangler              # Environment-specific TOML overlays
-  /docs
-    prd-mvp.md
-    tech-design.md
-  package.json             # Workspace root controlling shared tooling
-  pnpm-workspace.yaml      # Or npm workspaces; enables shared lint/build
+  /extension        # MV3 Chrome extension source
+  /worker           # Cloudflare Worker source (TypeScript + wrangler config)
+  /shortcuts        # Shortcut exports, helper scripts, documentation
+  /docs             # prd-mvp.md, tech-design.md, future notes
   README.md
 ```
-- Root configured as JS/TS workspace (pnpm or npm) for shared lint/build.
-- Each app/service has its own `package.json` and build scripts.
-- Docs consolidated under `/docs` for clarity.
+- Start without workspace tooling; add package/workspace managers later if code sharing becomes necessary.
+- Shared utilities can live in component folders until we see reuse pressure.
 
 ## 16. Outstanding Items
 - Confirm minimum macOS/Chrome versions to support.
 - Decide on alarm polling frequency (default 5 minutes unless performance dictates otherwise).
 - Evaluate need for staging vs production workers (two wrangler environments) before launch.
-
