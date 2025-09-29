@@ -39,7 +39,7 @@
 - [ ] Test on physical iPhone/iPad to confirm file permissions and iCloud sync behavior.
 
 ## Reliability & Ops
-- [ ] Configure 7-day TTL on KV writes and verify deletion on ACK.
+- [x] Configure 7-day TTL on KV writes and verify deletion on ACK.
 - [ ] Instrument metrics: enqueue count, push success/failure, pending size, ack latency.
 - [ ] Set up alerting/monitoring (Cloudflare Analytics or external) for rate limit breaches and failed pushes.
 - [ ] Draft runbook covering re-pair flow, key rotation, and failure recovery.
