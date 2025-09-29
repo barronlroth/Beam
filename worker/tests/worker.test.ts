@@ -183,7 +183,15 @@ describe("Beam Worker", () => {
 
       expect(ackRes.status).toBe(200);
       const ackBody = await ackRes.json();
-      expect(ackBody).toEqual({ acknowledged: true, itemId: enqueueBody.itemId });
+      expect(ackBody.acknowledged).toBe(true);
+      expect(ackBody.itemId).toBe(enqueueBody.itemId);
+      expect(typeof ackBody.acknowledgedAt).toBe("string");
+
+      const kvNamespace = env.BEAM_KV as MemoryKV;
+      const metadataRaw = kvNamespace.store.get(`pending-metadata:${enqueueBody.itemId}`);
+      expect(metadataRaw).not.toBeUndefined();
+      const metadata = JSON.parse(metadataRaw as string);
+      expect(metadata).toMatchObject({ deviceId, acknowledgedAt: ackBody.acknowledgedAt });
 
       const afterAck = await worker.fetch(
         new Request(`http://localhost/v1/devices/${deviceId}/pending`, {

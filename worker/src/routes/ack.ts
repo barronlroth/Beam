@@ -1,5 +1,5 @@
 import { errorResponse, jsonResponse, sha256Hex } from "../utils";
-import { deletePendingItem, getDevice, getPendingItem, resolveDeviceIdForItem } from "../storage";
+import { deletePendingItem, getDevice, getPendingItem, resolveDeviceIdForItem, putPendingMetadata } from "../storage";
 import type { Env } from "../types";
 import { logInfo } from "../logger";
 
@@ -37,7 +37,13 @@ export const acknowledgeItem = async (
 
   await deletePendingItem(env, deviceId, itemId);
 
+  const acknowledgedAt = new Date().toISOString();
+  await putPendingMetadata(env, itemId, {
+    deviceId,
+    acknowledgedAt
+  });
+
   logInfo("inbox.acknowledged", { deviceId, itemId });
 
-  return jsonResponse({ acknowledged: true, itemId });
+  return jsonResponse({ acknowledged: true, itemId, acknowledgedAt });
 };

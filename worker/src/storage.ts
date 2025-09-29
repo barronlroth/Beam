@@ -3,11 +3,13 @@ import type { DeviceRecord, Env, PendingItem } from "./types";
 const DEVICE_PREFIX = "device";
 const PENDING_PREFIX = "pending";
 const ITEM_INDEX_PREFIX = "pending-index";
+const PENDING_METADATA_PREFIX = "pending-metadata";
 const PENDING_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 
 export const deviceKey = (deviceId: string) => `${DEVICE_PREFIX}:${deviceId}`;
 export const pendingKey = (deviceId: string, itemId: string) => `${PENDING_PREFIX}:${deviceId}:${itemId}`;
 export const itemIndexKey = (itemId: string) => `${ITEM_INDEX_PREFIX}:${itemId}`;
+export const pendingMetadataKey = (itemId: string) => `${PENDING_METADATA_PREFIX}:${itemId}`;
 
 export const getDevice = async (env: Env, deviceId: string): Promise<DeviceRecord | null> => {
   const raw = await env.BEAM_KV.get(deviceKey(deviceId));
@@ -36,6 +38,16 @@ export const deletePendingItem = async (env: Env, deviceId: string, itemId: stri
 
 export const resolveDeviceIdForItem = async (env: Env, itemId: string): Promise<string | null> => {
   return (await env.BEAM_KV.get(itemIndexKey(itemId))) ?? null;
+};
+
+export const putPendingMetadata = async (
+  env: Env,
+  itemId: string,
+  metadata: Record<string, unknown>
+): Promise<void> => {
+  await env.BEAM_KV.put(pendingMetadataKey(itemId), JSON.stringify(metadata), {
+    expirationTtl: PENDING_TTL_SECONDS
+  });
 };
 
 export const listPendingItems = async (env: Env, deviceId: string): Promise<PendingItem[]> => {
