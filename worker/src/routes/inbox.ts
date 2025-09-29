@@ -3,6 +3,7 @@ import { getDevice, putPendingItem } from "../storage";
 import type { Env, PendingItem } from "../types";
 import { logInfo, logWarn } from "../logger";
 import { checkRateLimit } from "../rateLimit";
+import { sendWebPush, type WebPushSubscription } from "../push";
 
 type InboxBody = {
   url: unknown;
@@ -93,7 +94,17 @@ export const enqueueToInbox = async (request: Request, env: Env, deviceId: strin
 
   await putPendingItem(env, record);
 
-  // TODO: Web Push delivery implementation (crypto.subtle based VAPID signing)
+  await sendWebPush(env, {
+    device: {
+      deviceId,
+      subscription: device.subscription as WebPushSubscription
+    },
+    item: {
+      itemId,
+      url: record.url,
+      sentAt: record.sentAt
+    }
+  });
 
   logInfo("inbox.enqueued", {
     deviceId,

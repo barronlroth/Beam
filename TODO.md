@@ -11,7 +11,7 @@
 - [x] Configure `wrangler.toml` with KV binding, environments, and compatibility date.
 - [x] Implement `POST /v1/devices` handler: validate payload, hash inbox key, store subscription + metadata.
 - [x] Implement `POST /v1/inbox/:deviceId`: auth header, create `itemId`, persist `{ itemId, deviceId, url, sentAt }` in KV with 7-day TTL, enqueue push payload.
-- [ ] Hand-roll VAPID signing & payload encryption using Workers `crypto.subtle` (no Node deps).
+- [x] Hand-roll VAPID signing & payload encryption using Workers `crypto.subtle` (no Node deps).
 - [x] Implement `GET /v1/devices/:deviceId/pending`: auth header, list pending items ordered by enqueue time.
 - [x] Implement `POST /v1/items/:itemId/ack`: auth header, delete KV entry, optionally track receipt timestamp.
 - [x] Implement `POST /v1/devices/:deviceId/rotate-key`: validate old key, update hash, allow subscription refresh.

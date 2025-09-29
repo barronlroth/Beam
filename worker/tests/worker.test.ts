@@ -1,5 +1,11 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import crypto from "node:crypto";
+
+vi.mock("../src/push", () => ({
+  sendWebPush: vi.fn().mockResolvedValue({ ok: true })
+}));
+
+import { sendWebPush } from "../src/push";
 import worker from "../src/worker";
 import type { Env, PendingItem } from "../src/types";
 
@@ -68,6 +74,7 @@ describe("Beam Worker", () => {
   };
 
   beforeEach(() => {
+    vi.clearAllMocks();
     env = {
       API_VERSION: "v1",
       BEAM_KV: new MemoryKV()
@@ -125,6 +132,7 @@ describe("Beam Worker", () => {
     });
 
     it("enqueues a URL and surfaces it in pending list", async () => {
+      const sendWebPushMock = vi.mocked(sendWebPush);
       const enqueueRes = await worker.fetch(
         new Request(`http://localhost/v1/inbox/${deviceId}`, {
           method: "POST",
@@ -141,6 +149,14 @@ describe("Beam Worker", () => {
       expect(enqueueRes.status).toBe(202);
       const enqueueBody = await enqueueRes.json();
       expect(enqueueBody.itemId).toMatch(/^itm_/);
+      expect(sendWebPushMock).toHaveBeenCalledTimes(1);
+      expect(sendWebPushMock).toHaveBeenCalledWith(
+        env,
+        expect.objectContaining({
+          device: expect.objectContaining({ deviceId }),
+          item: expect.objectContaining({ itemId: enqueueBody.itemId, url: "https://example.com" })
+        })
+      );
 
       const pendingRes = await worker.fetch(
         new Request(`http://localhost/v1/devices/${deviceId}/pending`, {
