@@ -82,6 +82,7 @@ Beam Lite delivers a zero-friction path from an iOS share action to opening the 
   - Handles install/update, push, alarms, startup.
   - Enforces storm control (max 3 tabs/sec) and a 60s dedupe window.
   - Persists recent URL timestamps in `chrome.storage.local` for dedupe only.
+  - Delegates work to `swRuntime` helpers; options/config stored under `beam.config` and `beam.device`.
 - **Options page:** React/Vite or vanilla (small scope). Displays device info, toggle (`autoOpen`), QR/JSON, rotate key button.
 - **Popup (optional):** lightweight history view (reads last 20 items from local storage) and quick toggle.
 
@@ -96,6 +97,13 @@ Beam Lite delivers a zero-friction path from an iOS share action to opening the 
 - **Add Beam Device:** supports QR scan and manual paste; validates required keys, dedupes by `deviceId`, and treats last write as authoritative to tolerate iCloud sync races.
 - **Send to Beam:** Share Sheet only accepts URLs, supports "All Desktops" fan-out, includes `sentAt` timestamp, and surfaces a re-pair alert when the backend returns HTTP 401.
 - **Per-device shortcuts:** Hard-coded target, same payload structure, optional Quick Actions placement.
+
+## 11.1 Extension Runtime Architecture
+- `serviceWorker.ts`: registration helper (`registerDevice`, `ensureDeviceRegistration`) that generates IDs, computes inbox key hashes, and persists secrets to `chrome.storage.local`.
+- `swRuntime.ts`: pure runtime handling install and push events (dedupe window, 3 tabs/sec cap, ACK posting). Maintains in-memory state for recent URLs and tab queues.
+- `sw.ts`: actual MV3 service worker entry. Wires Chrome event listeners (`install`, `push`, `activate`), bridges storage/tabs APIs, and delegates to `swRuntime`/`serviceWorker` helpers.
+- `swAlarms.ts`: schedules periodic catch-up alarms via `chrome.alarms`; dedupe ensures only one alarm per interval.
+- Tests (`extension/tests/`) cover registration, runtime behavior, event wiring, and alarm scheduling (Vitest + jsdom).
 
 ## 11. Backend Implementation (Cloudflare Worker)
 - **Runtime:** TypeScript module worker (`export default { fetch }`).
