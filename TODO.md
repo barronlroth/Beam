@@ -15,8 +15,8 @@
 - [x] Implement `GET /v1/devices/:deviceId/pending`: auth header, list pending items ordered by enqueue time.
 - [x] Implement `POST /v1/items/:itemId/ack`: auth header, delete KV entry, optionally track receipt timestamp.
 - [x] Implement `POST /v1/devices/:deviceId/rotate-key`: validate old key, update hash, allow subscription refresh.
-- [ ] Add Cloudflare Rules-based rate limiting (10 req/min per IP + device) with KV fallback inside Worker.
-- [ ] Add lightweight logging with header redaction and structured error responses.
+- [x] Add Cloudflare Rules-based rate limiting (10 req/min per IP + device) with KV fallback inside Worker.
+- [x] Add lightweight logging with header redaction and structured error responses.
 - [ ] Write unit/integration tests (Workers `miniflare` or `wrangler dev` tests) for auth, persistence, and catch-up.
 
 ## Chrome Extension (Receiver)

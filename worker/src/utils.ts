@@ -17,10 +17,11 @@ export type ErrorCode =
   | "ERR_VALIDATION"
   | "ERR_INBOX_UNAUTHORIZED"
   | "ERR_INBOX_UNKNOWN_DEVICE"
-  | "ERR_ACK_UNKNOWN_ITEM";
+  | "ERR_ACK_UNKNOWN_ITEM"
+  | "ERR_RATE_LIMIT";
 
-export const errorResponse = (code: ErrorCode, message: string, status: number): Response =>
-  jsonResponse({ error: { code, message } }, { status });
+export const errorResponse = (code: ErrorCode, message: string, status: number, init?: ResponseInit): Response =>
+  jsonResponse({ error: { code, message } }, { status, ...init });
 
 export const safeJson = async <T>(request: Request): Promise<T | Response> => {
   try {

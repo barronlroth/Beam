@@ -5,6 +5,7 @@ import { enqueueToInbox } from "./routes/inbox";
 import { acknowledgeItem } from "./routes/ack";
 import { listPending } from "./routes/pending";
 import { rotateKey } from "./routes/rotate";
+import { logError, logInfo, redactHeaders } from "./logger";
 
 type RouteHandler = (
   request: Request,
@@ -66,6 +67,14 @@ const matchRoute = (method: string, pathname: string): { route: Route; params: R
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+    const requestId = crypto.randomUUID();
+    const baseMetadata = {
+      requestId,
+      method: request.method,
+      path: url.pathname
+    } as const;
+
+    logInfo("http.request", baseMetadata);
 
     if (!url.pathname.startsWith("/v1") && url.pathname !== "/healthz") {
       return errorResponse("ERR_ROUTER_NOT_FOUND", "Not found", 404);
@@ -80,8 +89,13 @@ export default {
     }
 
     try {
-      return await match.route.handler(request, env, ctx, match.params);
+      const response = await match.route.handler(request, env, ctx, match.params);
+      return response;
     } catch (error) {
+      logError("http.error", error, {
+        ...baseMetadata,
+        headers: redactHeaders(request.headers)
+      });
       const message = error instanceof Error ? error.message : "Unknown error";
       return errorResponse("ERR_WORKER_UNCAUGHT", message, 500);
     }

@@ -1,6 +1,8 @@
 import { errorResponse, jsonResponse, requiredString, safeJson, validateHttpUrl, sha256Hex } from "../utils";
 import { getDevice, putPendingItem } from "../storage";
 import type { Env, PendingItem } from "../types";
+import { logInfo, logWarn } from "../logger";
+import { checkRateLimit } from "../rateLimit";
 
 type InboxBody = {
   url: unknown;
@@ -34,6 +36,23 @@ export const enqueueToInbox = async (request: Request, env: Env, deviceId: strin
   const hashed = await sha256Hex(rawKey);
   if (hashed !== device.keyHash) {
     return errorResponse("ERR_INBOX_UNAUTHORIZED", "Invalid inbox key", 401);
+  }
+
+  const clientIp = request.headers.get("cf-connecting-ip") ?? "unknown";
+  const ipIdentifier = `ip:${clientIp}`;
+  const deviceIdentifier = `device:${deviceId}`;
+
+  const [ipLimit, deviceLimit] = await Promise.all([
+    checkRateLimit(env, ipIdentifier, RATE_LIMIT_OPTIONS),
+    checkRateLimit(env, deviceIdentifier, RATE_LIMIT_OPTIONS)
+  ]);
+
+  if (!ipLimit.allowed) {
+    return rateLimitResponse(ipLimit.reset, { deviceId, scope: "ip", identifier: clientIp });
+  }
+
+  if (!deviceLimit.allowed) {
+    return rateLimitResponse(deviceLimit.reset, { deviceId, scope: "device" });
   }
 
   const parsed = await safeJson<InboxBody>(request);
@@ -76,5 +95,21 @@ export const enqueueToInbox = async (request: Request, env: Env, deviceId: strin
 
   // TODO: Web Push delivery implementation (crypto.subtle based VAPID signing)
 
+  logInfo("inbox.enqueued", {
+    deviceId,
+    itemId
+  });
+
   return jsonResponse({ itemId, enqueued: true }, { status: 202 });
+};
+const RATE_LIMIT_OPTIONS = { limit: 10, windowSeconds: 60 } as const;
+
+const rateLimitResponse = (resetEpoch: number, metadata: Record<string, unknown>) => {
+  const retryAfter = Math.max(resetEpoch - Math.floor(Date.now() / 1000), 1);
+  logWarn("rate.limit", { ...metadata, retryAfter });
+  return errorResponse("ERR_RATE_LIMIT", "Rate limit exceeded", 429, {
+    headers: {
+      "Retry-After": retryAfter.toString()
+    }
+  });
 };

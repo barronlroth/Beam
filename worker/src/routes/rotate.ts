@@ -1,6 +1,7 @@
 import { errorResponse, jsonResponse, requiredString, safeJson, isObject, sha256Hex } from "../utils";
 import { getDevice, putDevice } from "../storage";
 import type { Env } from "../types";
+import { logInfo } from "../logger";
 
 type RotateBody = {
   keyHash: unknown;
@@ -59,6 +60,8 @@ export const rotateKey = async (
   };
 
   await putDevice(env, updatedDevice);
+
+  logInfo("device.rotate_key", { deviceId, rotated: true });
 
   return jsonResponse({ rotated: true }, { status: 200 });
 };

@@ -1,6 +1,7 @@
 import { errorResponse, jsonResponse, sha256Hex } from "../utils";
 import { getDevice, listPendingItems } from "../storage";
 import type { Env } from "../types";
+import { logInfo } from "../logger";
 
 const HEADER_INBOX_KEY = "x-inbox-key";
 
@@ -21,5 +22,8 @@ export const listPending = async (request: Request, env: Env, deviceId: string):
   }
 
   const items = await listPendingItems(env, deviceId);
+
+  logInfo("inbox.pending", { deviceId, count: items.length });
+
   return jsonResponse({ items }, { status: 200 });
 };

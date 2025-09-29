@@ -1,6 +1,7 @@
 import { errorResponse, requiredString, safeJson, isObject, jsonResponse } from "../utils";
 import { getDevice, putDevice } from "../storage";
 import type { Env, DeviceRecord } from "../types";
+import { logInfo } from "../logger";
 
 type RegisterDeviceBody = {
   deviceId: unknown;
@@ -67,6 +68,11 @@ export const registerDevice = async (request: Request, env: Env): Promise<Respon
   };
 
   await putDevice(env, record);
+
+  logInfo("device.registered", {
+    deviceId,
+    updated: Boolean(existing)
+  });
 
   return jsonResponse({ deviceId, updated: Boolean(existing) }, { status: existing ? 200 : 201 });
 };

@@ -1,6 +1,7 @@
 import { errorResponse, jsonResponse, sha256Hex } from "../utils";
 import { deletePendingItem, getDevice, getPendingItem, resolveDeviceIdForItem } from "../storage";
 import type { Env } from "../types";
+import { logInfo } from "../logger";
 
 const HEADER_INBOX_KEY = "x-inbox-key";
 
@@ -35,6 +36,8 @@ export const acknowledgeItem = async (
   }
 
   await deletePendingItem(env, deviceId, itemId);
+
+  logInfo("inbox.acknowledged", { deviceId, itemId });
 
   return jsonResponse({ acknowledged: true, itemId });
 };
