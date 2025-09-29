@@ -17,7 +17,7 @@
 - [x] Implement `POST /v1/devices/:deviceId/rotate-key`: validate old key, update hash, allow subscription refresh.
 - [x] Add Cloudflare Rules-based rate limiting (10 req/min per IP + device) with KV fallback inside Worker.
 - [x] Add lightweight logging with header redaction and structured error responses.
-- [ ] Write unit/integration tests (Workers `miniflare` or `wrangler dev` tests) for auth, persistence, and catch-up.
+- [x] Write unit/integration tests (covering auth, persistence, ACK, rotate).
 
 ## Chrome Extension (Receiver)
 - [ ] Scaffold MV3 project under `/extension` with TypeScript tooling.
