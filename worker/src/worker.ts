@@ -1,6 +1,10 @@
 import { errorResponse, jsonResponse } from "./utils";
 import type { Env } from "./types";
 import { registerDevice } from "./routes/devices";
+import { enqueueToInbox } from "./routes/inbox";
+import { acknowledgeItem } from "./routes/ack";
+import { listPending } from "./routes/pending";
+import { rotateKey } from "./routes/rotate";
 
 type RouteHandler = (
   request: Request,
@@ -24,26 +28,22 @@ const routes: Route[] = [
   {
     method: "POST",
     pattern: /^\/v1\/inbox\/(?<deviceId>[A-Za-z0-9_-]+)$/,
-    handler: async (_req, _env, _ctx, params) =>
-      errorResponse("ERR_UNIMPLEMENTED", `Inbox delivery not implemented for ${params.deviceId}`, 501)
+    handler: (request, env, _ctx, params) => enqueueToInbox(request, env, params.deviceId)
   },
   {
     method: "GET",
     pattern: /^\/v1\/devices\/(?<deviceId>[A-Za-z0-9_-]+)\/pending$/,
-    handler: async (_req, _env, _ctx, params) =>
-      errorResponse("ERR_UNIMPLEMENTED", `Pending lookup not implemented for ${params.deviceId}`, 501)
+    handler: (request, env, _ctx, params) => listPending(request, env, params.deviceId)
   },
   {
     method: "POST",
     pattern: /^\/v1\/items\/(?<itemId>[A-Za-z0-9_-]+)\/ack$/,
-    handler: async (_req, _env, _ctx, params) =>
-      errorResponse("ERR_UNIMPLEMENTED", `ACK not implemented for ${params.itemId}`, 501)
+    handler: (request, env, _ctx, params) => acknowledgeItem(request, env, params.itemId)
   },
   {
     method: "POST",
     pattern: /^\/v1\/devices\/(?<deviceId>[A-Za-z0-9_-]+)\/rotate-key$/,
-    handler: async (_req, _env, _ctx, params) =>
-      errorResponse("ERR_UNIMPLEMENTED", `Rotate key not implemented for ${params.deviceId}`, 501)
+    handler: (request, env, _ctx, params) => rotateKey(request, env, params.deviceId)
   },
   {
     method: "GET",

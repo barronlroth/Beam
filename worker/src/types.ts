@@ -11,3 +11,11 @@ export interface DeviceRecord {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface PendingItem {
+  itemId: string;
+  deviceId: string;
+  url: string;
+  sentAt: string;
+  createdAt: string;
+}

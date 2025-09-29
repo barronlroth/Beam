@@ -10,11 +10,11 @@
 - [x] Scaffold TypeScript Worker project (`wrangler init`) under `/worker`.
 - [x] Configure `wrangler.toml` with KV binding, environments, and compatibility date.
 - [x] Implement `POST /v1/devices` handler: validate payload, hash inbox key, store subscription + metadata.
-- [ ] Implement `POST /v1/inbox/:deviceId`: auth header, create `itemId`, persist `{ itemId, deviceId, url, sentAt }` in KV with 7-day TTL, enqueue push payload.
+- [x] Implement `POST /v1/inbox/:deviceId`: auth header, create `itemId`, persist `{ itemId, deviceId, url, sentAt }` in KV with 7-day TTL, enqueue push payload.
 - [ ] Hand-roll VAPID signing & payload encryption using Workers `crypto.subtle` (no Node deps).
-- [ ] Implement `GET /v1/devices/:deviceId/pending`: auth header, list pending items ordered by enqueue time.
-- [ ] Implement `POST /v1/items/:itemId/ack`: auth header, delete KV entry, optionally track receipt timestamp.
-- [ ] Implement `POST /v1/devices/:deviceId/rotate-key`: validate old key, update hash, allow subscription refresh.
+- [x] Implement `GET /v1/devices/:deviceId/pending`: auth header, list pending items ordered by enqueue time.
+- [x] Implement `POST /v1/items/:itemId/ack`: auth header, delete KV entry, optionally track receipt timestamp.
+- [x] Implement `POST /v1/devices/:deviceId/rotate-key`: validate old key, update hash, allow subscription refresh.
 - [ ] Add Cloudflare Rules-based rate limiting (10 req/min per IP + device) with KV fallback inside Worker.
 - [ ] Add lightweight logging with header redaction and structured error responses.
 - [ ] Write unit/integration tests (Workers `miniflare` or `wrangler dev` tests) for auth, persistence, and catch-up.
