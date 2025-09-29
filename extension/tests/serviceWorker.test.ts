@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { registerDevice, type RegistrationDeps } from "../src/serviceWorker";
+import {
+  registerDevice,
+  ensureDeviceRegistration,
+  type RegistrationDeps
+} from "../src/serviceWorker";
 
 describe("registerDevice", () => {
   const apiBaseUrl = "https://api.example.com";
@@ -51,5 +55,24 @@ describe("registerDevice", () => {
 
     const storageSet = deps.storage.set as unknown as ReturnType<typeof vi.fn>;
     expect(storageSet).toHaveBeenCalled();
+  });
+
+  it("reuses stored credentials without hitting network", async () => {
+    const stored = {
+      deviceId: "chr_existing",
+      inboxKey: "storedKey",
+      apiBaseUrl,
+      name: deviceName
+    };
+
+    const storageGet = deps.storage.get as unknown as ReturnType<typeof vi.fn>;
+    storageGet.mockResolvedValueOnce(stored);
+
+    const result = await ensureDeviceRegistration(deps, { apiBaseUrl, deviceName });
+
+    expect(result).toEqual({ deviceId: "chr_existing", inboxKey: "storedKey" });
+    expect(storageGet).toHaveBeenCalledWith("beam.device");
+    expect(deps.fetch).not.toHaveBeenCalled();
+    expect(deps.storage.set).not.toHaveBeenCalled();
   });
 });

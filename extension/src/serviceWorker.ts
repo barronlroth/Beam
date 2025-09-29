@@ -103,3 +103,18 @@ export const registerDevice = async (
 
   return { deviceId, inboxKey };
 };
+
+export const ensureDeviceRegistration = async (
+  deps: RegistrationDeps,
+  payload: RegistrationDeps & RegisterDevicePayload extends never ? never : RegisterDevicePayload
+): Promise<RegistrationResult> => {
+  const existing = (await deps.storage.get("beam.device")) as
+    | { deviceId: string; inboxKey: string; apiBaseUrl: string }
+    | undefined;
+
+  if (existing && existing.deviceId && existing.inboxKey && existing.apiBaseUrl === payload.apiBaseUrl) {
+    return { deviceId: existing.deviceId, inboxKey: existing.inboxKey };
+  }
+
+  return registerDevice(deps, payload);
+};
