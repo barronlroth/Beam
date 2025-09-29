@@ -212,8 +212,9 @@ Each hard-codes `{api, deviceId, inboxKey}` for that one device and skips the pi
 
 ---
 
-## 14) Open Questions
-- Minimum macOS/Chrome versions to support? (Assume latest stable + n-2.)
+## 14) Platform Targets
+- macOS: Ventura (13) and newer (Sonoma 14+) on Apple Silicon and Intel.
+- Chrome: latest stable plus the two previous major versions.
 
 ---
 

@@ -117,14 +117,21 @@ Beam Lite delivers a zero-friction path from an iOS share action to opening the 
 - Minimal retention: KV entries removed on ACK, with a 7-day TTL safety net; no long-term server-side history in MVP.
 - Dedupe to prevent tab storms; rate limiting to mitigate abuse.
 
-## 14. Deployment Workflow
+## 14. Configuration & Logging Strategy
+- **Environments:** local (wrangler dev), staging worker, production worker; each has its own `wrangler.toml` environment block and KV namespace.
+- **Secrets:** provisioned via `wrangler secret put` (e.g., VAPID keys). Local development uses `.dev.vars` kept out of version control.
+- **Runtime config:** non-secret values (API base URLs, feature flags) checked into environment-specific TOML under `/worker`.
+- **Logging:** structured JSON entries (`{ level, event, metadata }`) with headers redacted; never log `X-Inbox-Key` or payload URLs.
+- **Error codes:** Worker responses follow `ERR_<COMPONENT>_<DETAIL>` pattern (e.g., `ERR_INBOX_UNAUTHORIZED`, `ERR_PUSH_FAIL`) so clients can branch on deterministic strings.
+
+## 15. Deployment Workflow
 1. Develop locally with `wrangler dev` (provides mock KV).
 2. Run extension in Chrome dev mode pointing to staging API base.
 3. Publish Worker via `wrangler deploy` (environment-specific config via `wrangler.toml`).
 4. Bundle extension using `npm run build` and load into Chrome manually for testing.
 5. Distribute Shortcuts as `.shortcut` files or via iCloud share links.
 
-## 15. Proposed Monorepo Structure
+## 16. Proposed Monorepo Structure
 ```
 /beam-lite
   /extension        # MV3 Chrome extension source
@@ -136,7 +143,6 @@ Beam Lite delivers a zero-friction path from an iOS share action to opening the 
 - Start without workspace tooling; add package/workspace managers later if code sharing becomes necessary.
 - Shared utilities can live in component folders until we see reuse pressure.
 
-## 16. Outstanding Items
-- Confirm minimum macOS/Chrome versions to support.
+## 17. Outstanding Items
 - Decide on alarm polling frequency (default 5 minutes unless performance dictates otherwise).
 - Evaluate need for staging vs production workers (two wrangler environments) before launch.

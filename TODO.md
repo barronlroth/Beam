@@ -1,15 +1,15 @@
 # Beam Lite MVP TODO
 
 ## Cross-Cutting
-- [ ] Settle on supported macOS and Chrome versions (latest stable +/-2) and document in PRD.
+- [x] Settle on supported macOS and Chrome versions (latest stable +/-2) and document in PRD.
 - [ ] Register Cloudflare account/project and create `BEAM_KV` namespace (prod + staging).
-- [ ] Establish environment config strategy (local `.env`, wrangler secrets, staging/prod workers).
-- [ ] Define logging/redaction policy and error code conventions.
+- [x] Establish environment config strategy (local `.env`, wrangler secrets, staging/prod workers).
+- [x] Define logging/redaction policy and error code conventions.
 
 ## Cloudflare Worker (Backend)
-- [ ] Scaffold TypeScript Worker project (`wrangler init`) under `/worker`.
-- [ ] Configure `wrangler.toml` with KV binding, environments, and compatibility date.
-- [ ] Implement `POST /v1/devices` handler: validate payload, hash inbox key, store subscription + metadata.
+- [x] Scaffold TypeScript Worker project (`wrangler init`) under `/worker`.
+- [x] Configure `wrangler.toml` with KV binding, environments, and compatibility date.
+- [x] Implement `POST /v1/devices` handler: validate payload, hash inbox key, store subscription + metadata.
 - [ ] Implement `POST /v1/inbox/:deviceId`: auth header, create `itemId`, persist `{ itemId, deviceId, url, sentAt }` in KV with 7-day TTL, enqueue push payload.
 - [ ] Hand-roll VAPID signing & payload encryption using Workers `crypto.subtle` (no Node deps).
 - [ ] Implement `GET /v1/devices/:deviceId/pending`: auth header, list pending items ordered by enqueue time.
@@ -49,4 +49,3 @@
 - [ ] Perform internal dogfood with two desktop Chrome installs and at least one iOS device.
 - [ ] Iterate on UX copy/notifications based on dogfood feedback.
 - [ ] Finalize README with install steps and publish Shortcut share links.
-

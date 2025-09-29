@@ -1,0 +1,39 @@
+export const JSON_HEADERS = {
+  "content-type": "application/json"
+} as const;
+
+export const jsonResponse = (data: unknown, init: ResponseInit = {}): Response => {
+  const headers = new Headers(init.headers);
+  headers.set("content-type", JSON_HEADERS["content-type"]);
+  return new Response(JSON.stringify(data), { ...init, headers });
+};
+
+export type ErrorCode =
+  | "ERR_ROUTER_NOT_FOUND"
+  | "ERR_ROUTER_METHOD"
+  | "ERR_UNIMPLEMENTED"
+  | "ERR_WORKER_UNCAUGHT"
+  | "ERR_BODY_PARSE"
+  | "ERR_VALIDATION";
+
+export const errorResponse = (code: ErrorCode, message: string, status: number): Response =>
+  jsonResponse({ error: { code, message } }, { status });
+
+export const safeJson = async <T>(request: Request): Promise<T | Response> => {
+  try {
+    return (await request.json()) as T;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Invalid JSON";
+    return errorResponse("ERR_BODY_PARSE", message, 400);
+  }
+};
+
+export const requiredString = (value: unknown, label: string): string | null => {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    return `${label} must be a non-empty string`;
+  }
+  return null;
+};
+
+export const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);

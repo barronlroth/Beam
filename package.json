@@ -1,0 +1,11 @@
+{
+  "name": "beam-lite",
+  "version": "0.0.1",
+  "description": "Beam Lite monorepo for Chrome extension, Apple Shortcuts, and Cloudflare Worker backend.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "echo \"No linters configured yet\"",
+    "test": "echo \"No tests configured yet\""
+  }
+}
