@@ -20,7 +20,7 @@
 - [x] Write unit/integration tests (covering auth, persistence, ACK, rotate).
 
 ## Chrome Extension (Receiver)
-- [ ] Scaffold MV3 project under `/extension` with TypeScript tooling.
+- [x] Scaffold MV3 project under `/extension` with TypeScript tooling.
 - [ ] Implement service worker: install flow (generate deviceId/inboxKey, subscribe to push, call `/v1/devices`).
 - [ ] Implement push handler: dedupe (60s window via `chrome.storage.local`), open tab respecting 3 tabs/sec cap, call ACK endpoint.
 - [ ] Implement startup handler: fetch pending queue, open sequentially with storm control, ACK each.
