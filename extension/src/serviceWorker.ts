@@ -62,6 +62,13 @@ const generateInboxKey = (crypto: Crypto): string => {
   return toBase64Url(bytes);
 };
 
+interface StoredDeviceRecord {
+  deviceId: string;
+  inboxKey: string;
+  apiBaseUrl: string;
+  name?: string;
+}
+
 export const registerDevice = async (
   deps: RegistrationDeps,
   payload: RegisterDevicePayload
@@ -117,4 +124,50 @@ export const ensureDeviceRegistration = async (
   }
 
   return registerDevice(deps, payload);
+};
+
+const getStoredDevice = async (
+  storage: RegistrationDeps["storage"]
+): Promise<StoredDeviceRecord> => {
+  const existing = (await storage.get("beam.device")) as StoredDeviceRecord | undefined;
+  if (!existing || !existing.deviceId || !existing.inboxKey || !existing.apiBaseUrl) {
+    throw new Error("Device not registered");
+  }
+  return existing;
+};
+
+export const rotateDeviceKey = async (
+  deps: RegistrationDeps,
+  options?: { deviceName?: string }
+): Promise<RegistrationResult> => {
+  const device = await getStoredDevice(deps.storage);
+  const newInboxKey = generateInboxKey(deps.crypto);
+
+  const keyHashBuffer = await deps.crypto.subtle.digest("SHA-256", encoder.encode(newInboxKey));
+  const keyHash = toHex(new Uint8Array(keyHashBuffer));
+
+  const response = await deps.fetch(`${device.apiBaseUrl}/v1/devices/${device.deviceId}/rotate-key`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "X-Inbox-Key": device.inboxKey
+    },
+    body: JSON.stringify({
+      keyHash,
+      ...(options?.deviceName ? { name: options.deviceName } : {})
+    })
+  });
+
+  if (response.status >= 400) {
+    throw new Error(`Key rotation failed with status ${response.status}`);
+  }
+
+  const updated: StoredDeviceRecord = {
+    ...device,
+    inboxKey: newInboxKey,
+    name: options?.deviceName ?? device.name
+  };
+  await deps.storage.set("beam.device", updated);
+
+  return { deviceId: device.deviceId, inboxKey: newInboxKey };
 };

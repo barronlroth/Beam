@@ -8,7 +8,14 @@ const chrome = (globalThis as any).chrome;
 
 chrome.runtime = chrome.runtime || {
   sendMessage: vi.fn(),
-  id: "test-extension"
+  id: "test-extension",
+  getURL: vi.fn((path: string) => path),
+  onStartup: {
+    addListener: vi.fn()
+  },
+  onMessage: {
+    addListener: vi.fn()
+  }
 };
 
 chrome.storage = chrome.storage || {
@@ -28,5 +35,17 @@ chrome.tabs = chrome.tabs || {
 
 chrome.alarms = chrome.alarms || {
   create: vi.fn(),
-  clear: vi.fn()
+  clear: vi.fn(),
+  onAlarm: {
+    addListener: vi.fn()
+  }
+};
+
+chrome.notifications = chrome.notifications || {
+  create: vi.fn((id, options, callback) => {
+    if (typeof callback === "function") {
+      callback("mock-notification");
+    }
+    return "mock-notification";
+  })
 };

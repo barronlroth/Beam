@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   registerDevice,
   ensureDeviceRegistration,
+  rotateDeviceKey,
   type RegistrationDeps
 } from "../src/serviceWorker";
 
@@ -74,5 +75,59 @@ describe("registerDevice", () => {
     expect(storageGet).toHaveBeenCalledWith("beam.device");
     expect(deps.fetch).not.toHaveBeenCalled();
     expect(deps.storage.set).not.toHaveBeenCalled();
+  });
+});
+
+describe("rotateDeviceKey", () => {
+  const apiBaseUrl = "https://api.example.com";
+  const deviceName = "Test Chrome";
+
+  const buildDeps = () => ({
+    fetch: vi.fn().mockResolvedValue({ status: 200 }),
+    crypto,
+    storage: {
+      get: vi.fn().mockResolvedValue({
+        deviceId: "chr_existing",
+        inboxKey: "oldInboxKey",
+        apiBaseUrl,
+        name: deviceName
+      }),
+      set: vi.fn().mockResolvedValue(undefined)
+    },
+    getSubscription: vi.fn()
+  });
+
+  it("rotates inbox key and updates storage", async () => {
+    const deps = buildDeps();
+
+    const result = await rotateDeviceKey(deps, { deviceName: "Updated Chrome" });
+
+    expect(result.deviceId).toBe("chr_existing");
+    expect(result.inboxKey).not.toBe("oldInboxKey");
+
+    const fetchMock = deps.fetch as unknown as ReturnType<typeof vi.fn>;
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${apiBaseUrl}/v1/devices/chr_existing/rotate-key`,
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({ "X-Inbox-Key": "oldInboxKey" })
+      })
+    );
+
+    const storageSet = deps.storage.set as unknown as ReturnType<typeof vi.fn>;
+    expect(storageSet).toHaveBeenCalledWith(
+      "beam.device",
+      expect.objectContaining({
+        inboxKey: result.inboxKey,
+        name: "Updated Chrome"
+      })
+    );
+  });
+
+  it("throws when device not registered", async () => {
+    const deps = buildDeps();
+    (deps.storage.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce(undefined);
+
+    await expect(rotateDeviceKey(deps)).rejects.toThrow(/Device not registered/);
   });
 });

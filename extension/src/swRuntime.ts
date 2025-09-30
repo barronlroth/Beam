@@ -20,6 +20,7 @@ export interface PushDeps {
   fetch: typeof fetch;
   tabsCreate: (createProperties: { url: string; active?: boolean }) => Promise<unknown> | unknown;
   now: () => number;
+  notify?: (options: { title: string; message: string; url: string }) => Promise<void> | void;
   delay?: (ms: number, cb: () => void) => unknown;
 }
 
@@ -28,6 +29,10 @@ interface DeviceRecord {
   inboxKey: string;
   apiBaseUrl: string;
   name?: string;
+}
+
+interface SettingsRecord {
+  autoOpen?: boolean;
 }
 
 const RECENT_URL_WINDOW_MS = 60_000;
@@ -40,6 +45,10 @@ const openTimestamps: number[] = [];
 const tabQueue: Array<{ payload: PushPayload; device: DeviceRecord }> = [];
 let scheduled = false;
 let processing = false;
+
+const DEFAULT_SETTINGS: Required<SettingsRecord> = {
+  autoOpen: true
+};
 
 const defaultDelay = (ms: number, cb: () => void) => setTimeout(cb, ms);
 
@@ -57,12 +66,6 @@ const ackItem = async (deps: PushDeps, device: DeviceRecord, payload: PushPayloa
       "X-Inbox-Key": device.inboxKey
     }
   });
-};
-
-const openTab = async (deps: PushDeps, device: DeviceRecord, payload: PushPayload, now: number) => {
-  await Promise.resolve(deps.tabsCreate({ url: payload.url, active: true }));
-  recentUrls.set(payload.url, now);
-  await ackItem(deps, device, payload);
 };
 
 const scheduleProcessing = (deps: PushDeps, delayMs: number) => {
@@ -102,6 +105,47 @@ const enqueueTab = async (deps: PushDeps, device: DeviceRecord, payload: PushPay
   await processQueue(deps);
 };
 
+const getSettings = async (deps: PushDeps): Promise<Required<SettingsRecord>> => {
+  const stored = (await deps.storage.get("beam.settings")) as SettingsRecord | undefined;
+  if (!stored) return DEFAULT_SETTINGS;
+  return {
+    autoOpen: stored.autoOpen ?? DEFAULT_SETTINGS.autoOpen
+  };
+};
+
+const maybeNotify = async (deps: PushDeps, device: DeviceRecord, payload: PushPayload) => {
+  if (!deps.notify) return;
+  const title = device.name ? `Beam to ${device.name}` : "Beam Lite";
+  const message = payload.url;
+  await Promise.resolve(deps.notify({ title, message, url: payload.url }));
+};
+
+const openTab = async (deps: PushDeps, device: DeviceRecord, payload: PushPayload, now: number) => {
+  await Promise.resolve(deps.tabsCreate({ url: payload.url, active: true }));
+  recentUrls.set(payload.url, now);
+  await ackItem(deps, device, payload);
+};
+
+const processIncomingPayload = async (deps: PushDeps, device: DeviceRecord, payload: PushPayload) => {
+  const settings = await getSettings(deps);
+  const now = deps.now();
+
+  if (!settings.autoOpen) {
+    recentUrls.set(payload.url, now);
+    await maybeNotify(deps, device, payload);
+    await ackItem(deps, device, payload);
+    return;
+  }
+
+  const lastOpened = recentUrls.get(payload.url);
+  if (lastOpened !== undefined && now - lastOpened < RECENT_URL_WINDOW_MS) {
+    await ackItem(deps, device, payload);
+    return;
+  }
+
+  await enqueueTab(deps, device, payload);
+};
+
 const getDeviceRecord = async (deps: PushDeps): Promise<DeviceRecord> => {
   if (cachedDevice) return cachedDevice;
   const stored = await deps.storage.get("beam.device");
@@ -126,15 +170,7 @@ export const handleInstall = async (deps: InstallDeps): Promise<RegistrationResu
 
 export const handlePush = async (deps: PushDeps, payload: PushPayload): Promise<void> => {
   const device = await getDeviceRecord(deps);
-
-  const now = deps.now();
-  const lastOpened = recentUrls.get(payload.url);
-  if (lastOpened !== undefined && now - lastOpened < RECENT_URL_WINDOW_MS) {
-    await ackItem(deps, device, payload);
-    return;
-  }
-
-  await enqueueTab(deps, device, payload);
+  await processIncomingPayload(deps, device, payload);
 };
 
 export const resetRuntimeState = () => {
@@ -149,4 +185,30 @@ export const resetRuntimeState = () => {
 export const runtime = {
   handleInstall,
   handlePush
+};
+
+export const handleStartup = async (deps: PushDeps): Promise<void> => {
+  const device = await getDeviceRecord(deps);
+  const response = await deps.fetch(`${device.apiBaseUrl}/v1/devices/${device.deviceId}/pending`, {
+    headers: {
+      "Content-Type": "application/json",
+      "X-Inbox-Key": device.inboxKey
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Pending fetch failed with status ${response.status}`);
+  }
+
+  const data = (await response.json().catch(() => ({ items: [] }))) as {
+    items?: PushPayload[];
+  };
+
+  const items = Array.isArray(data.items) ? data.items : [];
+  for (const item of items) {
+    if (!item || typeof item.itemId !== "string" || typeof item.url !== "string") {
+      continue;
+    }
+    await processIncomingPayload(deps, device, item);
+  }
 };

@@ -1,7 +1,11 @@
-import { ensureDeviceRegistration } from "./serviceWorker";
-import { handleInstall, handlePush, resetRuntimeState } from "./swRuntime";
+import { ensureDeviceRegistration, rotateDeviceKey } from "./serviceWorker";
+import { handleInstall, handlePush, handleStartup, resetRuntimeState } from "./swRuntime";
+import { scheduleCatchUp, resetRuntimeState as resetAlarmState } from "./swAlarms";
 
 const globalAny = globalThis as any;
+
+const NOTIFICATION_ICON_DATA_URL =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==";
 
 const getRegistry = (): Record<string, Function[]> => {
   if (!globalAny.__listeners) {
@@ -64,22 +68,43 @@ const createRegistrationDeps = () => ({
   }
 });
 
+const performRegistration = async () => {
+  await handleInstall({
+    storage: {
+      get: readStorageValue
+    },
+    ensureDeviceRegistration: ({ apiBaseUrl, deviceName }) =>
+      ensureDeviceRegistration(createRegistrationDeps(), { apiBaseUrl, deviceName })
+  });
+  scheduleCatchUp(5);
+  return readStorageValue("beam.device");
+};
+
+const rotateKeyWithConfig = async () => {
+  const config = await readStorageValue("beam.config");
+  const deviceName = config?.deviceName;
+  const result = await rotateDeviceKey(createRegistrationDeps(), {
+    deviceName: typeof deviceName === "string" ? deviceName : undefined
+  });
+  return {
+    result,
+    device: await readStorageValue("beam.device")
+  };
+};
+
 registerListener("install", (event: ExtendableEvent) => {
   const promise = (async () => {
-    const config = await readStorageValue("beam.config");
-    if (!config?.apiBaseUrl || !config?.deviceName) {
-      throw new Error("Missing beam.config");
+    try {
+      await performRegistration();
+    } catch (error) {
+      if (error instanceof Error && /beam\.config/i.test(error.message)) {
+        console.warn("Beam Lite: missing config during install; complete setup in options page");
+        return;
+      }
+      throw error;
     }
-    return handleInstall({
-      storage: {
-        get: readStorageValue
-      },
-      ensureDeviceRegistration: ({ apiBaseUrl, deviceName }) =>
-        ensureDeviceRegistration(createRegistrationDeps(), { apiBaseUrl, deviceName })
-    });
   })().catch((error) => {
     console.error("Beam install failed", error);
-    throw error;
   });
 
   event.waitUntil(promise);
@@ -104,7 +129,25 @@ const buildPushDeps = () => ({
       }
     });
   },
-  now: () => Date.now()
+  now: () => Date.now(),
+  notify: ({ title, message, url }: { title: string; message: string; url: string }) => {
+    const notifications = globalAny.chrome?.notifications;
+    const runtime = globalAny.chrome?.runtime;
+    if (!notifications?.create) return Promise.resolve();
+    const notificationId = `beam-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const iconUrl = runtime?.getURL ? runtime.getURL("icon128.png") : NOTIFICATION_ICON_DATA_URL;
+    const options: chrome.notifications.NotificationOptions<true> = {
+      type: "basic",
+      iconUrl,
+      title,
+      message,
+      contextMessage: url,
+      priority: 0
+    };
+    return new Promise<void>((resolve) => {
+      notifications.create(notificationId, options, () => resolve());
+    });
+  }
 });
 
 registerListener("push", (event: PushEvent) => {
@@ -116,6 +159,56 @@ registerListener("push", (event: PushEvent) => {
 
 registerListener("activate", () => {
   resetRuntimeState();
+  resetAlarmState();
+});
+
+const runtimeApi = globalAny.chrome?.runtime;
+runtimeApi?.onMessage?.addListener((message: { type?: string } | undefined, _sender, sendResponse) => {
+  if (!message || typeof message.type !== "string") {
+    return false;
+  }
+
+  if (message.type === "beam.register") {
+    performRegistration()
+      .then((device) => {
+        sendResponse({ ok: true, device });
+      })
+      .catch((error: unknown) => {
+        console.error("Beam manual registration failed", error);
+        const messageText = error instanceof Error ? error.message : "Unknown registration error";
+        sendResponse({ ok: false, error: messageText });
+      });
+    return true;
+  }
+
+  if (message.type === "beam.rotate-key") {
+    rotateKeyWithConfig()
+      .then(({ device, result }) => {
+        sendResponse({ ok: true, device, result });
+      })
+      .catch((error: unknown) => {
+        console.error("Beam key rotation failed", error);
+        const messageText = error instanceof Error ? error.message : "Unknown rotation error";
+        sendResponse({ ok: false, error: messageText });
+      });
+    return true;
+  }
+
+  return false;
+});
+
+runtimeApi?.onStartup?.addListener(() => {
+  Promise.resolve(handleStartup(buildPushDeps())).catch((error) => {
+    console.error("Beam startup catch-up failed", error);
+  });
+});
+
+const alarmsApi = globalAny.chrome?.alarms;
+alarmsApi?.onAlarm?.addListener((alarm: chrome.alarms.Alarm) => {
+  if (alarm?.name !== "beam-catchup") return;
+  Promise.resolve(handleStartup(buildPushDeps())).catch((error) => {
+    console.error("Beam alarm catch-up failed", error);
+  });
 });
 
 export {};

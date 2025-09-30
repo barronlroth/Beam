@@ -1,0 +1,8 @@
+[
+  {
+    "name": "Sample MacBook",
+    "deviceId": "chr_sample",
+    "inboxKey": "sampleInboxKey==",
+    "api": "https://localhost:8787"
+  }
+]
