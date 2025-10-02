@@ -11,7 +11,7 @@ Beam Lite beams URLs from an iOS Share Sheet directly into Chrome on a chosen de
 1. Read the PRD (`docs/prd-mvp.md`) and technical design (`docs/tech-design.md`).
 2. Provision Cloudflare resources:
    - KV namespaces (already captured in `worker/wrangler.toml`).
-   - Set VAPID secrets using the commands in `docs/cloudflare-secret-setup.md`.
+   - Copy `docs/cloudflare-secret-setup.template.md` to `docs/cloudflare-secret-setup.md`, add your keys, and run the listed Wrangler commands (keep the filled file out of source control).
 3. Build & load the Chrome extension:
    ```bash
    cd extension
@@ -44,4 +44,3 @@ Beam Lite beams URLs from an iOS Share Sheet directly into Chrome on a chosen de
 - Extension implements push handling, options UI, rotate key flow, catch-up, and has Vitest coverage.
 - Cloudflare KV namespaces provisioned; secrets ready via Wrangler commands.
 - Shortcuts documentation ready; on-device authoring/export pending.
-
