@@ -5,12 +5,20 @@ compatibility_date = "2025-09-28"
 [vars]
 API_VERSION = "v1"
 
-[kv_namespaces]
-# Replace with real namespace IDs before deploy
-{ binding = "BEAM_KV", id = "<kv-id>" }
+[[kv_namespaces]]
+binding = "BEAM_KV"
+id = "37bee47db6c54683b38ec76a7c626c79"
 
 [env.staging]
 name = "beam-lite-worker-staging"
 
+[[env.staging.kv_namespaces]]
+binding = "BEAM_KV"
+id = "f6482fe0cbc44a649aa91c00205ec023"
+
 [env.production]
 name = "beam-lite-worker-prod"
+
+[[env.production.kv_namespaces]]
+binding = "BEAM_KV"
+id = "37bee47db6c54683b38ec76a7c626c79"
