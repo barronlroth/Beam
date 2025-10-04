@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "postbuild": "cp manifest.json dist/manifest.json",
+    "postbuild": "mkdir -p dist/options && cp dist/src/options/index.html dist/options/index.html && rm -rf dist/src && cp manifest.json dist/manifest.json",
     "test": "vitest run",
     "test:watch": "vitest watch"
   },

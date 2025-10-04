@@ -10,7 +10,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         sw: resolve(__dirname, "src/sw.ts"),
-        options: resolve(__dirname, "src/options/index.html")
+        "options/index": resolve(__dirname, "src/options/index.html")
       },
       output: {
         entryFileNames: (chunk) => {
@@ -20,9 +20,9 @@ export default defineConfig({
           return "assets/[name]-[hash].js";
         },
         chunkFileNames: "assets/[name]-[hash].js",
-        assetFileNames: ({ name }) => {
-          if (name && name.endsWith(".css")) {
-            return "options/[name]";
+        assetFileNames: ({ name, extname }) => {
+          if (extname === ".css") {
+            return "options/[name][extname]";
           }
           return "assets/[name]-[hash][extname]";
         }
